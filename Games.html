@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>KoolGames – Games</title>
+
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    background: black;
+    color: white;
+    font-family: Arial, sans-serif;
+    height: 100%;
+}
+
+/* TOP BAR */
+#topBar {
+    position: fixed;
+    inset: 0 0 auto 0;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    border-bottom: 2px solid white;
+    z-index: 5;
+}
+
+#userArea {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* MAIN */
+#main {
+    padding-top: 90px;
+    max-width: 900px;
+    margin: auto;
+}
+
+/* GAME CARD */
+.game {
+    border: 2px solid white;
+    border-radius: 20px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.game-title {
+    font-size: 20px;
+}
+
+.game-user {
+    opacity: 0.7;
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+/* BUTTONS */
+button {
+    background: white;
+    color: black;
+    border: 2px solid white;
+    border-radius: 999px;
+    padding: 10px 22px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+button:hover {
+    background: black;
+    color: white;
+}
+
+/* MODAL */
+#modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.9);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+#modalBox {
+    border: 2px solid white;
+    border-radius: 20px;
+    padding: 24px;
+    width: 420px;
+    text-align: center;
+}
+
+input[type="text"] {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 12px;
+    background: black;
+    color: white;
+    border: 2px solid white;
+    border-radius: 999px;
+    text-align: center;
+}
+
+/* EMOJIS */
+.custom-emoji {
+    width: 1em;
+    height: 1em;
+    vertical-align: -0.15em;
+    image-rendering: pixelated;
+}
+</style>
+</head>
+
+<body>
+
+<div id="topBar">
+    <div>KoolGames</div>
+    <div id="userArea">
+        <div id="username"></div>
+        <button onclick="openUpload()">Upload</button>
+    </div>
+</div>
+
+<div id="main">
+    <h2>Community Games</h2>
+    <div id="gamesList"></div>
+</div>
+
+<!-- UPLOAD MODAL -->
+<div id="modal">
+    <div id="modalBox">
+        <h3>Upload Game Files</h3>
+        <input id="gameTitle" type="text" placeholder="Game title">
+        <input id="files" type="file" multiple>
+        <br><br>
+        <button onclick="uploadGame()">Upload</button>
+        <button onclick="closeUpload()">Cancel</button>
+    </div>
+</div>
+
+<script src="emoji-preset.js"></script>
+
+<script>
+/* AUTH */
+const user = localStorage.getItem("currentUser");
+if (!user) location.href = "index.html";
+document.getElementById("username").innerHTML = parseEmojis(user);
+
+/* DB */
+let db;
+const req = indexedDB.open("koolgamesDB", 1);
+
+req.onupgradeneeded = e => {
+    db = e.target.result;
+    db.createObjectStore("games", { keyPath: "id" });
+};
+
+req.onsuccess = e => {
+    db = e.target.result;
+    renderGames();
+};
+
+/* MODAL */
+function openUpload() {
+    document.getElementById("modal").style.display = "flex";
+}
+function closeUpload() {
+    document.getElementById("modal").style.display = "none";
+}
+
+/* UPLOAD */
+function uploadGame() {
+    const title = document.getElementById("gameTitle").value.trim();
+    const files = document.getElementById("files").files;
+    if (!title || files.length === 0) return;
+
+    const readerPromises = [...files].map(file => {
+        return new Promise(res => {
+            const r = new FileReader();
+            r.onload = () => res({
+                name: file.name,
+                type: file.type,
+                data: r.result
+            });
+            r.readAsDataURL(file);
+        });
+    });
+
+    Promise.all(readerPromises).then(fileData => {
+        const tx = db.transaction("games", "readwrite");
+        tx.objectStore("games").put({
+            id: Date.now(),
+            title,
+            user,
+            files: fileData
+        });
+        closeUpload();
+        renderGames();
+    });
+}
+
+/* RENDER */
+function renderGames() {
+    const list = document.getElementById("gamesList");
+    list.innerHTML = "";
+
+    const tx = db.transaction("games", "readonly");
+    const store = tx.objectStore("games");
+
+    store.openCursor().onsuccess = e => {
+        const cur = e.target.result;
+        if (!cur) return;
+
+        const game = cur.value;
+        const div = document.createElement("div");
+        div.className = "game";
+        div.innerHTML = `
+            <div class="game-title">${parseEmojis(game.title)}</div>
+            <div class="game-user">by ${parseEmojis(game.user)}</div>
+            <button onclick="runGame(${game.id})">Play</button>
+        `;
+        list.appendChild(div);
+        cur.continue();
+    };
+}
+
+/* RUN GAME */
+function runGame(id) {
+    const tx = db.transaction("games", "readonly");
+    const store = tx.objectStore("games");
+    store.get(id).onsuccess = e => {
+        const game = e.target.result;
+        if (!game) return;
+
+        const fileMap = {};
+        game.files.forEach(f => fileMap[f.name] = f.data);
+
+        let entry = game.files.find(f => f.name.endsWith(".html"));
+        if (!entry) return alert("No HTML file found");
+
+        let html = atob(entry.data.split(",")[1]);
+        html = html.replace(
+            /src="([^"]+)"/g,
+            (m, p) => fileMap[p] ? `src="${fileMap[p]}"` : m
+        );
+
+        const blob = new Blob([html], { type: "text/html" });
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank");
+    };
+}
+</script>
+
+</body>
+</html>
