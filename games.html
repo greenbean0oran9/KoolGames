@@ -6,10 +6,10 @@
 
 <style>
 body {
+    margin: 0;
     background: black;
     color: white;
     font-family: Arial, sans-serif;
-    margin: 0;
 }
 
 /* TOP BAR */
@@ -30,9 +30,9 @@ body {
 
 /* MAIN */
 #main {
-    padding: 20px;
     max-width: 1000px;
     margin: auto;
+    padding: 20px;
 }
 
 /* GAME CARD */
@@ -58,16 +58,6 @@ body {
     flex: 1;
 }
 
-.game-title {
-    font-size: 20px;
-}
-
-.game-user {
-    opacity: 0.7;
-    font-size: 14px;
-    margin-bottom: 8px;
-}
-
 /* BUTTONS */
 button {
     border-radius: 999px;
@@ -76,7 +66,7 @@ button {
     background: white;
     color: black;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.25s ease;
 }
 button:hover {
     background: black;
@@ -107,7 +97,35 @@ button:hover {
     border: none;
 }
 
-/* UPLOAD INPUT */
+/* UPLOAD MODAL */
+#uploadModal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 30;
+}
+
+#uploadBox {
+    border: 2px solid white;
+    border-radius: 18px;
+    padding: 20px;
+    width: 300px;
+    text-align: center;
+}
+
+input {
+    width: 100%;
+    padding: 10px;
+    border-radius: 12px;
+    border: 2px solid white;
+    background: black;
+    color: white;
+    margin-bottom: 12px;
+}
+
 input[type="file"] {
     display: none;
 }
@@ -128,7 +146,7 @@ input[type="file"] {
     <div>KoolGames</div>
     <div id="userArea">
         <div id="username"></div>
-        <button onclick="startUpload()">Upload</button>
+        <button onclick="openUpload()">Create</button>
     </div>
 </div>
 
@@ -137,13 +155,23 @@ input[type="file"] {
     <div id="games"></div>
 </div>
 
-<!-- EMBED PLAYER -->
+<!-- PLAYER -->
 <div id="player">
     <div id="playerBar">
         <div id="playerTitle"></div>
         <button onclick="closePlayer()">Close</button>
     </div>
     <iframe id="gameFrame"></iframe>
+</div>
+
+<!-- UPLOAD -->
+<div id="uploadModal">
+    <div id="uploadBox">
+        <h3>Create Game</h3>
+        <input id="gameTitle" placeholder="Game title">
+        <button onclick="pickFiles()">Choose Files</button>
+        <button onclick="closeUpload()">Cancel</button>
+    </div>
 </div>
 
 <input id="fileInput" type="file" multiple>
@@ -176,14 +204,13 @@ async function loadGames() {
         const g = d.data();
         const div = document.createElement("div");
         div.className = "game";
-
         div.innerHTML = `
             <img class="thumb" src="${g.thumbnail}">
             <div class="game-info">
-                <div class="game-title">${parseEmojis(g.title)}</div>
-                <div class="game-user">by ${parseEmojis(g.user)}</div>
+                <div><strong>${parseEmojis(g.title)}</strong></div>
+                <div style="opacity:.7">by ${parseEmojis(g.user)}</div>
                 <button onclick="playGame('${g.entry}')">Play</button>
-                ${g.user === user ? `<button onclick="deleteGame('${d.id}')">Delete</button>` : ``}
+                ${g.user === user ? `<button onclick="deleteGame('${d.id}')">Delete</button>` : ""}
             </div>
         `;
         gamesDiv.appendChild(div);
@@ -191,41 +218,37 @@ async function loadGames() {
 }
 loadGames();
 
-/* UPLOAD */
-window.startUpload = () => {
-    const title = prompt("Game title?");
-    if (!title) return;
+/* UPLOAD FLOW */
+window.openUpload = () => {
+    document.getElementById("uploadModal").style.display = "flex";
+};
+
+window.closeUpload = () => {
+    document.getElementById("uploadModal").style.display = "none";
+};
+
+window.pickFiles = () => {
+    const title = document.getElementById("gameTitle").value.trim();
+    if (!title) return alert("Enter a game title");
     fileInput.onchange = e => uploadGame(title, e.target.files);
     fileInput.click();
 };
 
 async function uploadGame(title, files) {
     let thumbnail = null;
-    const uploaded = [];
+    let entry = null;
 
     for (const file of files) {
-        const storageRef = ref(storage, `games/${Date.now()}_${file.name}`);
-        await uploadBytes(storageRef, file);
-        const url = await getDownloadURL(storageRef);
+        const r = ref(storage, `games/${Date.now()}_${file.name}`);
+        await uploadBytes(r, file);
+        const url = await getDownloadURL(r);
 
-        if (!thumbnail && file.type.startsWith("image/")) {
-            thumbnail = url;
-        }
-        if (file.name.endsWith(".html")) {
-            uploaded.unshift({ name: file.name, url });
-        } else {
-            uploaded.push({ name: file.name, url });
-        }
+        if (!thumbnail && file.type.startsWith("image/")) thumbnail = url;
+        if (file.name.endsWith(".html")) entry = url;
     }
 
-    if (!thumbnail) {
-        alert("Include at least one image for thumbnail");
-        return;
-    }
-
-    const entry = uploaded.find(f => f.name.endsWith(".html"))?.url;
-    if (!entry) {
-        alert("Include an HTML file");
+    if (!thumbnail || !entry) {
+        alert("Need an HTML file + an image thumbnail");
         return;
     }
 
@@ -236,13 +259,13 @@ async function uploadGame(title, files) {
         entry
     });
 
+    closeUpload();
     loadGames();
 }
 
 /* PLAYER */
-window.playGame = (url) => {
+window.playGame = url => {
     document.getElementById("player").style.display = "flex";
-    document.getElementById("playerTitle").innerText = "Playing";
     document.getElementById("gameFrame").src = url;
 };
 
@@ -252,7 +275,7 @@ window.closePlayer = () => {
 };
 
 /* DELETE */
-window.deleteGame = async (id) => {
+window.deleteGame = async id => {
     if (!confirm("Delete this game?")) return;
     await deleteDoc(doc(db, "games", id));
     loadGames();
