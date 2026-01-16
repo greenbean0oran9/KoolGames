@@ -1,288 +1,242 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>KoolGames</title>
+<title>KoolGames – Games</title>
 
 <style>
-html, body {
+body {
     margin: 0;
-    padding: 0;
     background: black;
     color: white;
     font-family: Arial, sans-serif;
-    height: 100%;
-    overflow: hidden;
 }
 
-/* CLICK TO START */
-#startOverlay {
-    position: absolute;
-    inset: 0;
-    background: black;
+#topBar {
+    height: 60px;
+    border-bottom: 2px solid white;
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    justify-content: center;
-    font-size: 32px;
-    cursor: pointer;
-    z-index: 10;
+    padding: 0 20px;
 }
 
-/* STAGE */
-#stage {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-}
-
-/* INTRO TEXT */
-#introText {
-    font-size: 48px;
-    animation: fontCycle 0.2s infinite;
-    transition: opacity 1s ease;
-}
-
-@keyframes fontCycle {
-    0% { font-family: Arial; }
-    25% { font-family: "Comic Sans MS"; }
-    50% { font-family: "Courier New"; }
-    75% { font-family: "Times New Roman"; }
-}
-
-/* FLASH */
-#flash {
-    position: absolute;
-    inset: 0;
-    background: white;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 3s ease;
-}
-
-/* LOGO */
-#logo {
-    width: 420px;
-    opacity: 0;
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    animation: sway 4s ease-in-out infinite;
-    transition: top 1.2s ease, opacity 2s ease;
-}
-
-@keyframes sway {
-    0%, 100% { transform: translateY(-50%) rotate(-2deg); }
-    50% { transform: translateY(-50%) rotate(2deg); }
-}
-
-/* UI */
-#ui {
-    position: absolute;
-    top: 55%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 14px;
-    opacity: 0;
-    transition: opacity 1s ease;
-}
-
-/* INPUTS */
-input {
-    background: black;
-    color: white;
-    border: 2px solid white;
-    border-radius: 999px;
-    padding: 14px 20px;
-    font-size: 16px;
-    width: 320px;
-    text-align: center;
-    outline: none;
-}
-
-/* BUTTONS */
 button {
+    border-radius: 999px;
+    padding: 8px 18px;
+    border: 2px solid white;
     background: white;
     color: black;
-    border: 2px solid white;
-    border-radius: 999px;
-    padding: 14px 26px;
-    font-size: 16px;
     cursor: pointer;
-    transition: all 0.4s ease;
 }
-
 button:hover {
     background: black;
     color: white;
 }
 
-/* EMOJIS */
-.custom-emoji {
-    width: 1em;
-    height: 1em;
-    vertical-align: -0.15em;
-    image-rendering: pixelated;
+#main {
+    max-width: 1000px;
+    margin: auto;
+    padding: 20px;
+}
+
+.game {
+    border: 2px solid white;
+    border-radius: 18px;
+    padding: 14px;
+    margin-bottom: 16px;
+    display: flex;
+    gap: 16px;
+}
+
+.thumb {
+    width: 160px;
+    height: 90px;
+    object-fit: cover;
+    border-radius: 12px;
+    border: 2px solid white;
+}
+
+/* UPLOAD PANEL */
+#uploadPanel {
+    display: none;
+    border: 2px solid white;
+    border-radius: 18px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+input {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+    background: black;
+    color: white;
+    border: 2px solid white;
+    border-radius: 12px;
+}
+
+#player {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.95);
+    display: none;
+    flex-direction: column;
+}
+
+#player iframe {
+    flex: 1;
+    border: none;
 }
 </style>
 </head>
 
 <body>
 
-<div id="startOverlay">CLICK TO START</div>
-
-<div id="stage">
-    <div id="introText">KoolGames :) :YARR:</div>
-    <img id="logo" src="koolgmaes.png">
-    <div id="ui">
-        <div id="loginArea"></div>
+<div id="topBar">
+    <div>KoolGames</div>
+    <div>
+        <span id="username"></span>
+        <button id="createBtn">Create</button>
     </div>
 </div>
 
-<div id="flash"></div>
+<div id="main">
 
-<audio id="itemSound" src="mario-kart-wii-item-box.mp3"></audio>
-<audio id="bgMusic" src="Eternal Towers of Hell OST - Skyward Archipelago 4.mp3" loop></audio>
+<div id="uploadPanel">
+    <h3>Create Game</h3>
+    <input id="titleInput" placeholder="Game title">
+    <input id="fileInput" type="file" multiple>
+    <button id="uploadBtn">Upload</button>
+</div>
 
-<script src="emoji-preset.js"></script>
+<h2>Community Games</h2>
+<div id="games"></div>
 
-<script>
-const startOverlay = document.getElementById("startOverlay");
-const introText = document.getElementById("introText");
-const logo = document.getElementById("logo");
-const ui = document.getElementById("ui");
-const flash = document.getElementById("flash");
-const loginArea = document.getElementById("loginArea");
+</div>
 
-const itemSound = document.getElementById("itemSound");
-const bgMusic = document.getElementById("bgMusic");
+<div id="player">
+    <button id="closePlayerBtn">Close</button>
+    <iframe id="frame"></iframe>
+</div>
 
-introText.innerHTML = parseEmojis(introText.innerHTML);
+<script type="module">
+import { db, storage } from "./firebase.js";
+import {
+  collection, addDoc, getDocs, deleteDoc, doc
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import {
+  ref, uploadBytes, getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
-/* UTIL */
-function generatePasskey() {
-    return Math.random().toString(36).slice(2, 10).toUpperCase();
-}
+/* ELEMENTS */
+const uploadPanel = document.getElementById("uploadPanel");
+const createBtn = document.getElementById("createBtn");
+const uploadBtn = document.getElementById("uploadBtn");
+const titleInput = document.getElementById("titleInput");
+const fileInput = document.getElementById("fileInput");
+const gamesDiv = document.getElementById("games");
+const frame = document.getElementById("frame");
+const player = document.getElementById("player");
+const usernameSpan = document.getElementById("username");
 
-function getAccounts() {
-    return JSON.parse(localStorage.getItem("accounts") || "{}");
-}
+/* AUTH */
+const user = localStorage.getItem("currentUser");
+if (!user) location.href = "index.html";
+usernameSpan.textContent = user;
 
-function saveAccounts(acc) {
-    localStorage.setItem("accounts", JSON.stringify(acc));
-}
+/* CREATE BUTTON */
+createBtn.addEventListener("click", () => {
+    uploadPanel.style.display =
+        uploadPanel.style.display === "block" ? "none" : "block";
+});
 
-/* UI RENDER */
-function renderUI() {
-    const current = localStorage.getItem("currentUser");
+/* UPLOAD BUTTON */
+uploadBtn.addEventListener("click", async () => {
+    const title = titleInput.value.trim();
+    const files = fileInput.files;
 
-    if (current) {
-        loginArea.innerHTML = `
-            <button id="helloBtn"></button>
-            <button onclick="logout()">Log out</button>
+    if (!title || files.length === 0) {
+        alert("Title and files required");
+        return;
+    }
+
+    let thumbnail = null;
+    let entry = null;
+
+    for (const file of files) {
+        const r = ref(storage, `games/${Date.now()}_${file.name}`);
+        await uploadBytes(r, file);
+        const url = await getDownloadURL(r);
+
+        if (!thumbnail && file.type.startsWith("image/")) thumbnail = url;
+        if (file.name.endsWith(".html")) entry = url;
+    }
+
+    if (!thumbnail || !entry) {
+        alert("Need an image + HTML file");
+        return;
+    }
+
+    await addDoc(collection(db, "games"), {
+        title,
+        user,
+        thumbnail,
+        entry
+    });
+
+    titleInput.value = "";
+    fileInput.value = "";
+    uploadPanel.style.display = "none";
+    loadGames();
+});
+
+/* LOAD GAMES */
+async function loadGames() {
+    gamesDiv.innerHTML = "";
+    const snap = await getDocs(collection(db, "games"));
+    snap.forEach(d => {
+        const g = d.data();
+        const el = document.createElement("div");
+        el.className = "game";
+        el.innerHTML = `
+            <img class="thumb" src="${g.thumbnail}">
+            <div>
+                <b>${g.title}</b><br>
+                by ${g.user}<br>
+                <button data-play="${g.entry}">Play</button>
+                ${g.user === user ? `<button data-del="${d.id}">Delete</button>` : ""}
+            </div>
         `;
-        const helloBtn = document.getElementById("helloBtn");
-        helloBtn.innerHTML = parseEmojis(`hello ${current}`);
-        helloBtn.onclick = () => {
-            window.location.href = "games.html";
-        };
-        return;
-    }
+        gamesDiv.appendChild(el);
+    });
 
-    loginArea.innerHTML = `
-        <button onclick="showLogin()">Login</button>
-        <button onclick="showSignup()">Sign Up</button>
-    `;
+    document.querySelectorAll("[data-play]").forEach(b =>
+        b.onclick = () => openPlayer(b.dataset.play)
+    );
+    document.querySelectorAll("[data-del]").forEach(b =>
+        b.onclick = () => deleteGame(b.dataset.del)
+    );
+}
+loadGames();
+
+/* PLAYER */
+function openPlayer(url) {
+    player.style.display = "flex";
+    frame.src = url;
 }
 
-/* LOGIN */
-function showLogin() {
-    loginArea.innerHTML = `
-        <input id="loginUser" placeholder="username">
-        <input id="loginKey" placeholder="passkey">
-        <button onclick="login()">Login</button>
-        <button onclick="renderUI()">Back</button>
-    `;
-}
-
-function login() {
-    const user = document.getElementById("loginUser").value.trim();
-    const key = document.getElementById("loginKey").value.trim();
-    const accounts = getAccounts();
-
-    if (!accounts[user] || accounts[user].passkey !== key) {
-        alert("Invalid username or passkey");
-        return;
-    }
-
-    localStorage.setItem("currentUser", user);
-    renderUI();
-}
-
-/* SIGN UP */
-function showSignup() {
-    loginArea.innerHTML = `
-        <input id="signupEmail" placeholder="email">
-        <input id="signupUser" placeholder="username (emojis ok)">
-        <button onclick="signup()">Create Account</button>
-        <button onclick="renderUI()">Back</button>
-    `;
-}
-
-function signup() {
-    const email = document.getElementById("signupEmail").value.trim();
-    const user = document.getElementById("signupUser").value.trim();
-
-    if (!email || !user) return;
-
-    const accounts = getAccounts();
-    if (accounts[user]) {
-        alert("Username already exists");
-        return;
-    }
-
-    const passkey = generatePasskey();
-    accounts[user] = { email, passkey };
-    saveAccounts(accounts);
-
-    alert(`SAVE THIS PASSKEY:\n\n${passkey}`);
-    localStorage.setItem("currentUser", user);
-    renderUI();
-}
-
-/* LOGOUT */
-function logout() {
-    localStorage.removeItem("currentUser");
-    renderUI();
-}
-
-/* START SEQUENCE */
-startOverlay.onclick = () => {
-    startOverlay.style.display = "none";
-    itemSound.play();
-
-    setTimeout(() => {
-        flash.style.opacity = "1";
-        introText.style.opacity = "0";
-    }, 3000);
-
-    setTimeout(() => flash.style.opacity = "0", 3300);
-
-    setTimeout(() => {
-        logo.style.opacity = "1";
-        bgMusic.volume = 0.5;
-        bgMusic.play();
-    }, 3600);
-
-    setTimeout(() => {
-        logo.style.top = "30%";
-        ui.style.opacity = "1";
-        renderUI();
-    }, 5600);
+document.getElementById("closePlayerBtn").onclick = () => {
+    frame.src = "";
+    player.style.display = "none";
 };
+
+/* DELETE */
+async function deleteGame(id) {
+    if (!confirm("Delete game?")) return;
+    await deleteDoc(doc(db, "games", id));
+    loadGames();
+}
 </script>
 
 </body>
