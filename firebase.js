@@ -4,12 +4,12 @@ import { getFirestore } from "https://www.gstatic.com/firebasejs/10.7.1/firebase
 import { getStorage } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
 const firebaseConfig = {
-  apiKey: "PASTE_HERE",
-  authDomain: "PASTE_HERE",
-  projectId: "PASTE_HERE",
-  storageBucket: "PASTE_HERE",
-  messagingSenderId: "PASTE_HERE",
-  appId: "PASTE_HERE"
+  apiKey: "AIzaSyDJJCuZmajV9g_CCqhRoU0Nz-w5f2_BXGw",
+  authDomain: "koolgames-361eb.firebaseapp.com",
+  projectId: "koolgames-361eb",
+  storageBucket: "koolgames-361eb.firebasestorage.app",
+  messagingSenderId: "581685872645",
+  appId: "1:581685872645:web:166ce50ae5bc8e0485746c"
 };
 
 export const app = initializeApp(firebaseConfig);
