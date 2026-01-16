@@ -3,92 +3,261 @@
 <head>
 <meta charset="UTF-8">
 <title>KoolGames – Games</title>
+
 <style>
-body { background:black; color:white; font-family:Arial; margin:0 }
-#topBar {
-  height:60px; border-bottom:2px solid white;
-  display:flex; justify-content:space-between; align-items:center;
-  padding:0 20px;
+body {
+    background: black;
+    color: white;
+    font-family: Arial, sans-serif;
+    margin: 0;
 }
-#main { padding:20px; max-width:900px; margin:auto }
-.game { border:2px solid white; border-radius:16px; padding:14px; margin-bottom:12px }
-button { border-radius:999px; padding:8px 18px; border:2px solid white }
+
+/* TOP BAR */
+#topBar {
+    height: 60px;
+    border-bottom: 2px solid white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px;
+}
+
+#userArea {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* MAIN */
+#main {
+    padding: 20px;
+    max-width: 1000px;
+    margin: auto;
+}
+
+/* GAME CARD */
+.game {
+    border: 2px solid white;
+    border-radius: 18px;
+    padding: 14px;
+    margin-bottom: 16px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.thumb {
+    width: 160px;
+    height: 90px;
+    object-fit: cover;
+    border-radius: 12px;
+    border: 2px solid white;
+}
+
+.game-info {
+    flex: 1;
+}
+
+.game-title {
+    font-size: 20px;
+}
+
+.game-user {
+    opacity: 0.7;
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+/* BUTTONS */
+button {
+    border-radius: 999px;
+    padding: 8px 18px;
+    border: 2px solid white;
+    background: white;
+    color: black;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+button:hover {
+    background: black;
+    color: white;
+}
+
+/* PLAYER */
+#player {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.95);
+    display: none;
+    flex-direction: column;
+    z-index: 20;
+}
+
+#playerBar {
+    height: 50px;
+    border-bottom: 2px solid white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 16px;
+}
+
+#player iframe {
+    flex: 1;
+    border: none;
+}
+
+/* UPLOAD INPUT */
+input[type="file"] {
+    display: none;
+}
+
+/* EMOJIS */
+.custom-emoji {
+    width: 1em;
+    height: 1em;
+    vertical-align: -0.15em;
+    image-rendering: pixelated;
+}
 </style>
 </head>
 
 <body>
+
 <div id="topBar">
-  <div>KoolGames</div>
-  <div>
-    <span id="username"></span>
-    <button onclick="openUpload()">Upload</button>
-  </div>
+    <div>KoolGames</div>
+    <div id="userArea">
+        <div id="username"></div>
+        <button onclick="startUpload()">Upload</button>
+    </div>
 </div>
 
 <div id="main">
-  <h2>Community Games</h2>
-  <div id="games"></div>
+    <h2>Community Games</h2>
+    <div id="games"></div>
 </div>
 
-<input id="files" type="file" multiple hidden>
-<input id="title" placeholder="Game title" hidden>
+<!-- EMBED PLAYER -->
+<div id="player">
+    <div id="playerBar">
+        <div id="playerTitle"></div>
+        <button onclick="closePlayer()">Close</button>
+    </div>
+    <iframe id="gameFrame"></iframe>
+</div>
+
+<input id="fileInput" type="file" multiple>
 
 <script src="emoji-preset.js"></script>
 
 <script type="module">
 import { db, storage } from "./firebase.js";
-import { collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+import {
+  collection, addDoc, getDocs, deleteDoc, doc
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import {
+  ref, uploadBytes, getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
+/* AUTH */
 const user = localStorage.getItem("currentUser");
 if (!user) location.href = "index.html";
 document.getElementById("username").innerHTML = parseEmojis(user);
 
 const gamesDiv = document.getElementById("games");
+const fileInput = document.getElementById("fileInput");
 
+/* LOAD GAMES */
 async function loadGames() {
-  gamesDiv.innerHTML = "";
-  const snap = await getDocs(collection(db, "games"));
-  snap.forEach(doc => {
-    const g = doc.data();
-    gamesDiv.innerHTML += `
-      <div class="game">
-        <b>${parseEmojis(g.title)}</b><br>
-        by ${parseEmojis(g.user)}<br><br>
-        <button onclick="play('${doc.id}')">Play</button>
-      </div>`;
-  });
+    gamesDiv.innerHTML = "";
+    const snap = await getDocs(collection(db, "games"));
+
+    snap.forEach(d => {
+        const g = d.data();
+        const div = document.createElement("div");
+        div.className = "game";
+
+        div.innerHTML = `
+            <img class="thumb" src="${g.thumbnail}">
+            <div class="game-info">
+                <div class="game-title">${parseEmojis(g.title)}</div>
+                <div class="game-user">by ${parseEmojis(g.user)}</div>
+                <button onclick="playGame('${g.entry}')">Play</button>
+                ${g.user === user ? `<button onclick="deleteGame('${d.id}')">Delete</button>` : ``}
+            </div>
+        `;
+        gamesDiv.appendChild(div);
+    });
 }
-
-window.openUpload = () => {
-  const title = prompt("Game title?");
-  if (!title) return;
-  document.getElementById("files").onchange = e => upload(title, e.target.files);
-  document.getElementById("files").click();
-};
-
-async function upload(title, files) {
-  const uploaded = [];
-  for (const file of files) {
-    const r = ref(storage, `games/${Date.now()}_${file.name}`);
-    await uploadBytes(r, file);
-    uploaded.push({ name:file.name, url: await getDownloadURL(r) });
-  }
-
-  await addDoc(collection(db,"games"), {
-    title,
-    user,
-    files: uploaded
-  });
-
-  loadGames();
-}
-
-window.play = async (id) => {
-  location.href = `run.html?id=${id}`;
-};
-
 loadGames();
+
+/* UPLOAD */
+window.startUpload = () => {
+    const title = prompt("Game title?");
+    if (!title) return;
+    fileInput.onchange = e => uploadGame(title, e.target.files);
+    fileInput.click();
+};
+
+async function uploadGame(title, files) {
+    let thumbnail = null;
+    const uploaded = [];
+
+    for (const file of files) {
+        const storageRef = ref(storage, `games/${Date.now()}_${file.name}`);
+        await uploadBytes(storageRef, file);
+        const url = await getDownloadURL(storageRef);
+
+        if (!thumbnail && file.type.startsWith("image/")) {
+            thumbnail = url;
+        }
+        if (file.name.endsWith(".html")) {
+            uploaded.unshift({ name: file.name, url });
+        } else {
+            uploaded.push({ name: file.name, url });
+        }
+    }
+
+    if (!thumbnail) {
+        alert("Include at least one image for thumbnail");
+        return;
+    }
+
+    const entry = uploaded.find(f => f.name.endsWith(".html"))?.url;
+    if (!entry) {
+        alert("Include an HTML file");
+        return;
+    }
+
+    await addDoc(collection(db, "games"), {
+        title,
+        user,
+        thumbnail,
+        entry
+    });
+
+    loadGames();
+}
+
+/* PLAYER */
+window.playGame = (url) => {
+    document.getElementById("player").style.display = "flex";
+    document.getElementById("playerTitle").innerText = "Playing";
+    document.getElementById("gameFrame").src = url;
+};
+
+window.closePlayer = () => {
+    document.getElementById("gameFrame").src = "";
+    document.getElementById("player").style.display = "none";
+};
+
+/* DELETE */
+window.deleteGame = async (id) => {
+    if (!confirm("Delete this game?")) return;
+    await deleteDoc(doc(db, "games", id));
+    loadGames();
+};
 </script>
+
 </body>
 </html>
