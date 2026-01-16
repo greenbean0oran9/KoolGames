@@ -12,7 +12,6 @@ body {
     font-family: Arial, sans-serif;
 }
 
-/* TOP BAR */
 #topBar {
     height: 60px;
     border-bottom: 2px solid white;
@@ -22,20 +21,25 @@ body {
     padding: 0 20px;
 }
 
-#userArea {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+button {
+    border-radius: 999px;
+    padding: 8px 18px;
+    border: 2px solid white;
+    background: white;
+    color: black;
+    cursor: pointer;
+}
+button:hover {
+    background: black;
+    color: white;
 }
 
-/* MAIN */
 #main {
     max-width: 1000px;
     margin: auto;
     padding: 20px;
 }
 
-/* GAME CARD */
 .game {
     border: 2px solid white;
     border-radius: 18px;
@@ -43,7 +47,6 @@ body {
     margin-bottom: 16px;
     display: flex;
     gap: 16px;
-    align-items: center;
 }
 
 .thumb {
@@ -54,88 +57,36 @@ body {
     border: 2px solid white;
 }
 
-.game-info {
-    flex: 1;
-}
-
-/* BUTTONS */
-button {
-    border-radius: 999px;
-    padding: 8px 18px;
-    border: 2px solid white;
-    background: white;
-    color: black;
-    cursor: pointer;
-    transition: all 0.25s ease;
-}
-button:hover {
-    background: black;
-    color: white;
-}
-
-/* PLAYER */
-#player {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.95);
+/* UPLOAD PANEL */
+#uploadPanel {
     display: none;
-    flex-direction: column;
-    z-index: 20;
-}
-
-#playerBar {
-    height: 50px;
-    border-bottom: 2px solid white;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 16px;
-}
-
-#player iframe {
-    flex: 1;
-    border: none;
-}
-
-/* UPLOAD MODAL */
-#uploadModal {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.85);
-    display: none;
-    justify-content: center;
-    align-items: center;
-    z-index: 30;
-}
-
-#uploadBox {
     border: 2px solid white;
     border-radius: 18px;
-    padding: 20px;
-    width: 300px;
-    text-align: center;
+    padding: 16px;
+    margin-bottom: 20px;
 }
 
 input {
     width: 100%;
     padding: 10px;
-    border-radius: 12px;
-    border: 2px solid white;
+    margin-bottom: 10px;
     background: black;
     color: white;
-    margin-bottom: 12px;
+    border: 2px solid white;
+    border-radius: 12px;
 }
 
-input[type="file"] {
+#player {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.95);
     display: none;
+    flex-direction: column;
 }
 
-/* EMOJIS */
-.custom-emoji {
-    width: 1em;
-    height: 1em;
-    vertical-align: -0.15em;
-    image-rendering: pixelated;
+#player iframe {
+    flex: 1;
+    border: none;
 }
 </style>
 </head>
@@ -144,39 +95,30 @@ input[type="file"] {
 
 <div id="topBar">
     <div>KoolGames</div>
-    <div id="userArea">
-        <div id="username"></div>
-        <button onclick="openUpload()">Create</button>
+    <div>
+        <span id="username"></span>
+        <button onclick="toggleUpload()">Create</button>
     </div>
 </div>
 
 <div id="main">
-    <h2>Community Games</h2>
-    <div id="games"></div>
+
+<div id="uploadPanel">
+    <h3>Create Game</h3>
+    <input id="titleInput" placeholder="Game title">
+    <input id="fileInput" type="file" multiple>
+    <button onclick="upload()">Upload</button>
 </div>
 
-<!-- PLAYER -->
+<h2>Community Games</h2>
+<div id="games"></div>
+
+</div>
+
 <div id="player">
-    <div id="playerBar">
-        <div id="playerTitle"></div>
-        <button onclick="closePlayer()">Close</button>
-    </div>
-    <iframe id="gameFrame"></iframe>
+    <button onclick="closePlayer()">Close</button>
+    <iframe id="frame"></iframe>
 </div>
-
-<!-- UPLOAD -->
-<div id="uploadModal">
-    <div id="uploadBox">
-        <h3>Create Game</h3>
-        <input id="gameTitle" placeholder="Game title">
-        <button onclick="pickFiles()">Choose Files</button>
-        <button onclick="closeUpload()">Cancel</button>
-    </div>
-</div>
-
-<input id="fileInput" type="file" multiple>
-
-<script src="emoji-preset.js"></script>
 
 <script type="module">
 import { db, storage } from "./firebase.js";
@@ -187,54 +129,28 @@ import {
   ref, uploadBytes, getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
-/* AUTH */
 const user = localStorage.getItem("currentUser");
 if (!user) location.href = "index.html";
-document.getElementById("username").innerHTML = parseEmojis(user);
+username.textContent = user;
 
 const gamesDiv = document.getElementById("games");
-const fileInput = document.getElementById("fileInput");
 
-/* LOAD GAMES */
-async function loadGames() {
-    gamesDiv.innerHTML = "";
-    const snap = await getDocs(collection(db, "games"));
-
-    snap.forEach(d => {
-        const g = d.data();
-        const div = document.createElement("div");
-        div.className = "game";
-        div.innerHTML = `
-            <img class="thumb" src="${g.thumbnail}">
-            <div class="game-info">
-                <div><strong>${parseEmojis(g.title)}</strong></div>
-                <div style="opacity:.7">by ${parseEmojis(g.user)}</div>
-                <button onclick="playGame('${g.entry}')">Play</button>
-                ${g.user === user ? `<button onclick="deleteGame('${d.id}')">Delete</button>` : ""}
-            </div>
-        `;
-        gamesDiv.appendChild(div);
-    });
-}
-loadGames();
-
-/* UPLOAD FLOW */
-window.openUpload = () => {
-    document.getElementById("uploadModal").style.display = "flex";
+/* TOGGLE UPLOAD */
+window.toggleUpload = () => {
+    uploadPanel.style.display =
+        uploadPanel.style.display === "block" ? "none" : "block";
 };
 
-window.closeUpload = () => {
-    document.getElementById("uploadModal").style.display = "none";
-};
+/* UPLOAD */
+window.upload = async () => {
+    const title = titleInput.value.trim();
+    const files = fileInput.files;
 
-window.pickFiles = () => {
-    const title = document.getElementById("gameTitle").value.trim();
-    if (!title) return alert("Enter a game title");
-    fileInput.onchange = e => uploadGame(title, e.target.files);
-    fileInput.click();
-};
+    if (!title || files.length === 0) {
+        alert("Title + files required");
+        return;
+    }
 
-async function uploadGame(title, files) {
     let thumbnail = null;
     let entry = null;
 
@@ -248,7 +164,7 @@ async function uploadGame(title, files) {
     }
 
     if (!thumbnail || !entry) {
-        alert("Need an HTML file + an image thumbnail");
+        alert("Need 1 image + 1 HTML file");
         return;
     }
 
@@ -259,24 +175,47 @@ async function uploadGame(title, files) {
         entry
     });
 
-    closeUpload();
+    titleInput.value = "";
+    fileInput.value = "";
+    uploadPanel.style.display = "none";
     loadGames();
-}
-
-/* PLAYER */
-window.playGame = url => {
-    document.getElementById("player").style.display = "flex";
-    document.getElementById("gameFrame").src = url;
 };
 
+/* LOAD */
+async function loadGames() {
+    gamesDiv.innerHTML = "";
+    const snap = await getDocs(collection(db, "games"));
+    snap.forEach(d => {
+        const g = d.data();
+        const el = document.createElement("div");
+        el.className = "game";
+        el.innerHTML = `
+            <img class="thumb" src="${g.thumbnail}">
+            <div>
+                <b>${g.title}</b><br>
+                by ${g.user}<br>
+                <button onclick="play('${g.entry}')">Play</button>
+                ${g.user === user ? `<button onclick="del('${d.id}')">Delete</button>` : ""}
+            </div>
+        `;
+        gamesDiv.appendChild(el);
+    });
+}
+loadGames();
+
+/* PLAYER */
+window.play = url => {
+    player.style.display = "flex";
+    frame.src = url;
+};
 window.closePlayer = () => {
-    document.getElementById("gameFrame").src = "";
-    document.getElementById("player").style.display = "none";
+    frame.src = "";
+    player.style.display = "none";
 };
 
 /* DELETE */
-window.deleteGame = async id => {
-    if (!confirm("Delete this game?")) return;
+window.del = async id => {
+    if (!confirm("Delete game?")) return;
     await deleteDoc(doc(db, "games", id));
     loadGames();
 };
